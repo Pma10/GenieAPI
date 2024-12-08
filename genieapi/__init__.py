@@ -2,4 +2,4 @@ from .GenieAPI import GenieAPI
 
 __all__ = ["GenieAPI"]
 
-__version__ = "0.1.1"
+__version__ = "0.1.2"

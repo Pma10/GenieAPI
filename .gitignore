@@ -3,3 +3,4 @@ dist
 GenieAPI.egg-info
 .gitignore
 __pycache__
+.idea

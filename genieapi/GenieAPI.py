@@ -7,7 +7,7 @@ from genieapi.Error import GenieScraperError
 
 
 class GenieAPI:
-    """지니뮤직 가사 불러오기 클래스"""
+    """지니뮤직 API"""
 
     def __init__(self):
         self.LYRICS_BASE_URL = "https://dn.genie.co.kr/app/purchase/get_msl.asp?path=a&songid="
