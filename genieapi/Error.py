@@ -1,0 +1,2 @@
+class GenieScraperError(Exception):
+    pass
