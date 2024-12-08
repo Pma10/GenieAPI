@@ -10,7 +10,6 @@ class GenieAPI:
     """지니뮤직 가사 불러오기 클래스"""
 
     def __init__(self):
-        """지니뮤직 검색 및 가사 조회를 위한 기본 URL 초기화."""
         self.LYRICS_BASE_URL = "https://dn.genie.co.kr/app/purchase/get_msl.asp?path=a&songid="
         self.SEARCH_BASE_URL = "https://www.genie.co.kr/search/searchAuto"
 

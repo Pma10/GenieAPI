@@ -10,3 +10,17 @@
 
 ```bash
 pip install GenieAPI
+```
+
+# 사용 방법
+```python
+from genieapi import GenieAPI
+
+genie = GenieAPI()
+song = genie.search_song("APT ROSE",limit=1)
+
+genie.get_lyrics(song[0][1])
+```
+
+- APT ROSE -> 곡 제목
+- limit=1 -> 가져올 곡의 개수 (기본값: 1)
