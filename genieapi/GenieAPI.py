@@ -105,25 +105,3 @@ class GenieAPI:
             f.write("\n".join(lrc_lines))
         print(f"[GENIEAPI] LRC 파일 생성: {output_path}")
         return output_path
-
-
-def main():
-    try:
-        genie = Genie()
-        songs = genie.search_song("APT(아파트)", limit=1)
-
-        if songs:
-            print(f"[GENIEAPI] 검색 결과: {songs}")
-            song_id = songs[0][1]
-            genie.get_lyrics(song_id)
-        else:
-            print("[GENIEAPI] 노래를 찾을 수 없습니다.")
-
-    except GenieScraperError as e:
-        print(f"[GENIEAPi] 가사 불러오기 에러: {e}")
-    except Exception as e:
-        print(f"[GENIEAPi] 에러: {e}")
-
-
-if __name__ == "__main__":
-    main()

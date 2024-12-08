@@ -2,6 +2,4 @@ build
 dist
 GenieAPI.egg-info
 .gitignore
-__init__.py
 __pycache__
-setup.py
