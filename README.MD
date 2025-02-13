@@ -1,4 +1,3 @@
-```markdown
 # GenieAPI 🎵
 
 **GenieAPI**는 [Genie Music](https://www.genie.co.kr/) 데이터를 쉽게 가져올 수 있는 Python API 라이브러리입니다.
@@ -34,7 +33,6 @@ print(song)
 # 2. 싱크 가사 다운로드
 # 검색 결과에서 첫 번째 곡의 ID(song[0]['id'])를 사용하여 가사를 다운로드합니다.
 genie.get_lyrics(song[0]['id'])
-```
 
 - **APT ROSE:** 검색할 곡 제목  
 - **limit=1:** 가져올 곡의 개수 (기본값: 1)
