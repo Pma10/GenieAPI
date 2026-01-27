@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='GenieAPI',
-    version='0.1.2',
+    version='0.1.3',
     description='Genie Music API',
     long_description=open('README.md', encoding='utf-8').read(),
     long_description_content_type='text/markdown',
@@ -10,7 +10,8 @@ setup(
     author_email='pmavmak10@gmail.com',
     url='https://github.com/Pma10/GenieAPI',
     install_requires=[
-        "requests"
+        "requests",
+        "beautifulsoup4"
     ],
     packages=find_packages(exclude=[]),
     keywords=['genie', 'korea', 'lyrics', 'api', 'music'],
