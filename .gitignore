@@ -1,6 +1,11 @@
-build
-dist
-GenieAPI.egg-info
-.gitignore
-__pycache__
-.idea
+__pycache__/
+*.pyc
+.idea/
+.vscode/
+venv/
+env/
+.env
+debug_*.py
+test_output.txt
+test_result/
+*.log

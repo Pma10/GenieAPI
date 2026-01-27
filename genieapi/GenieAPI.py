@@ -1,131 +1,118 @@
-import os
-import json
 import requests
-from typing import List, Dict, Optional, Tuple
 from bs4 import BeautifulSoup
-from genieapi.Error import GenieScraperError
-
+from typing import List, Optional, Tuple, Dict
+import json
+from .models import Song, Lyric, ChartEntry, Playlist, Album
+from .Error import GenieScraperError
+from . import parsers
 
 class GenieAPI:
-    """지니뮤직 API"""
+    """지니뮤직 API 레퍼 (권장하지 않는 비공식 API)"""
+
+    BASE_URL = "https://www.genie.co.kr"
 
     def __init__(self):
-        self.SEARCH_BASE_URL = "https://www.genie.co.kr/search/searchAuto"
-        self.SONG_INFO_BASE_URL = "https://www.genie.co.kr/detail/songInfo?xgnm="
-        self.LYRICS_BASE_URL = "https://dn.genie.co.kr/app/purchase/get_msl.asp?path=a&songid="
-
-    def _get_request_headers(self) -> dict:
-        """브라우저를 모방한 요청 헤더 생성."""
-        return {
+        self.session = requests.Session()
+        self.session.headers.update({
             "User-Agent": (
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                 "AppleWebKit/537.36 (KHTML, like Gecko) "
                 "Chrome/91.0.4472.124 Safari/537.36"
             )
-        }
+        })
 
-    def search_song(self, query: str, limit: int = 4) -> List[Dict[str, str]]:
-        """
-        지니뮤직에서 노래 검색.
-
-        입력값:
-            query (str): 검색할 노래 이름
-            limit (int, optional): 검색 결과 제한. 기본값은 4.
-
-        반환값:
-            각 노래 정보를 담은 dictionary 리스트.
-            각 dictionary는 다음 키를 포함합니다:
-                - title: 노래 제목
-                - id: 노래 ID
-                - artist: 아티스트 이름
-                - thumbnail: 썸네일 URL
-        """
+    def _get_soup(self, url: str, params: Optional[dict] = None) -> BeautifulSoup:
+        """URL을 요청하고 BeautifulSoup 객체를 반환합니다."""
         try:
-            response = requests.get(
-                self.SEARCH_BASE_URL,
-                params={"query": query},
-                headers=self._get_request_headers()
-            )
+            response = self.session.get(url, params=params)
             response.raise_for_status()
-            data = response.json()
-
-            results = []
-            for song in data.get("song", [])[:limit]:
-                song_id = song.get("id", "")
-                artist, _ = self._parse_genie_extra_info(song.get("field1", ""))
-                thumbnail = self._get_album_art_url(song_id)
-                results.append({
-                    "title": song.get("word", ""),
-                    "id": song_id,
-                    "artist": artist,
-                    "thumbnail": thumbnail or "없음"
-                })
-
-            return results
-
+            return BeautifulSoup(response.text, "html.parser")
         except requests.RequestException as e:
-            raise GenieScraperError(f"검색 요청 실패: {e}")
-        except (KeyError, IndexError, json.JSONDecodeError) as e:
-            raise GenieScraperError(f"예상치 못한 응답 형식: {e}")
+            raise GenieScraperError(f"네트워크 요청 실패: {e}")
 
-    def _parse_genie_extra_info(self, extra_info: str) -> Tuple[str, str]:
-        """추가 정보에서 아티스트와 앨범 분리"""
-        parts = extra_info.split(' - ', 1)
-        artist = parts[0].strip()
-        album = parts[1].strip() if len(parts) > 1 else ""
-        return artist, album
+    def search_song(self, query: str, limit: int = 20) -> List[Song]:
+        """
+        노래 검색 (더 풍부한 결과를 위해 메인 검색 페이지 파싱)
+        """
+        url = f"{self.BASE_URL}/search/searchMain"
+        soup = self._get_soup(url, params={"query": query})
+        
+        songs = []
+        # selector relaxed for robustness
+        rows = soup.select("div.search_song tr.list")
+        
+        for row in rows[:limit]:
+            try:
+                song = parsers.parse_song_row(row)
+                if song:
+                    songs.append(song)
+            except Exception as e:
+                print(f"[DEBUG] 검색 결과 파싱 오류: {e}")
+                continue
+                
+        return songs
 
-    def _get_album_art_url(self, song_id: str) -> Optional[str]:
-        """지니뮤직에서 앨범 아트 URL 가져오기"""
+    def get_chart_top200(self, page: int = 1) -> List[ChartEntry]:
+        """
+        실시간 Top 200 차트 조회
+        page 1: 1~50위, page 2: 51~100위 ...
+        """
+        url = f"{self.BASE_URL}/chart/top200"
+        soup = self._get_soup(url, params={"ditc": "D", "ymd": "20230101", "hh": "12", "rtm": "Y", "pg": page}) # 파라미터는 지니 기본값 참조
+        return parsers.parse_chart_entries(soup)
+
+    def get_playlist_songs(self, playlist_id: str) -> List[Song]:
+        """플레이리스트 수록곡 조회"""
+        url = f"{self.BASE_URL}/playlist/detailView"
+        soup = self._get_soup(url, params={"plms": playlist_id})
+        
+        songs = []
+        rows = soup.select("#songlist-box > div.music-list-wrap > table > tbody > tr.list")
+        
+        for row in rows:
+            song = parsers.parse_song_row(row)
+            if song:
+                songs.append(song)
+        
+        return songs
+
+    def get_lyrics(self, song_id: str) -> Lyric:
+        """가사 조회"""
+        url = "https://dn.genie.co.kr/app/purchase/get_msl.asp"
         try:
-            response = requests.get(
-                f"{self.SONG_INFO_BASE_URL}{song_id}",
-                headers=self._get_request_headers()
-            )
+            response = self.session.get(url, params={"path": "a", "songid": song_id})
             response.raise_for_status()
-            soup = BeautifulSoup(response.text, 'html.parser')
-            album_img = soup.select_one('div.photo-zone span.cover > img')
-            if album_img and 'src' in album_img.attrs:
-                img_url = album_img['src']
-                if img_url.startswith('//'):
-                    img_url = 'https:' + img_url
-                return img_url.replace('/dims/resize/Q_80,0', '')
+            
+            # JSONP response handling: extract json from parentheses
+            content = response.text
+            if "(" in content and ")" in content:
+                json_str = content[content.index("(") + 1 : content.rindex(")")]
+                data = json.loads(json_str)
+                return Lyric(song_id=song_id, raw_lyrics=data)
+            else:
+                 raise GenieScraperError("가사 데이터 형식이 올바르지 않습니다.")
+                 
         except Exception as e:
-            print(f"[DEBUG] 앨범 아트 URL 가져오기 실패: {e}")
-        return None
-
-    def get_lyrics(self, song_id: str) -> Optional[str]:
-        """주어진 노래 ID의 가사 조회."""
-        try:
-            response = requests.get(
-                f"{self.LYRICS_BASE_URL}{song_id}",
-                headers=self._get_request_headers()
-            )
-            response.raise_for_status()
-            lyrics_json_str = response.text[
-                response.text.index("(") + 1:response.text.rindex(")")
-            ]
-            return self._make_lrc_file(song_id, lyrics_json_str)
-        except requests.RequestException as e:
             raise GenieScraperError(f"가사 조회 실패: {e}")
-        except (ValueError, json.JSONDecodeError) as e:
-            raise GenieScraperError(f"잘못된 가사 형식: {e}")
 
-    def _make_lrc_file(self, file_name: str, lyrics_json: str) -> str:
-        """동기화된 가사를 가진 LRC 파일 생성."""
-        os.makedirs("result", exist_ok=True)
+    def get_song_detail(self, song_id: str) -> Optional[Song]:
+        """
+        노래 상세 정보를 조회하여 (장르, 재생시간 등) Song 객체를 반환합니다.
+        """
+        url = f"{self.BASE_URL}/detail/songInfo"
         try:
-            lyrics_data = json.loads(lyrics_json)
-        except json.JSONDecodeError as e:
-            raise GenieScraperError(f"가사 JSON 파싱 실패: {e}")
+            soup = self._get_soup(url, params={"xgnm": song_id})
+            return parsers.parse_song_detail(soup, song_id)
+        except Exception as e:
+            print(f"상세 정보 조회 실패: {e}")
+            return None
 
-        output_path = os.path.join("result", f"{file_name}.lrc")
-        lrc_lines = [
-            f"[{int(time_ms) // 60000:02}:{(int(time_ms) % 60000) // 1000:02}.{(int(time_ms) % 1000) // 10:02}] {lyric}"
-            for time_ms, lyric in sorted(lyrics_data.items(), key=lambda x: int(x[0]))
-        ]
-
-        with open(output_path, "w", encoding="utf-8") as f:
-            f.write("\n".join(lrc_lines))
-        print(f"[GENIEAPI] LRC 파일 생성: {output_path}")
-        return output_path
+    def get_album_detail(self, album_id: str) -> Optional[Album]:
+        """앨범 상세 정보 조회"""
+        url = f"{self.BASE_URL}/detail/albumInfo"
+        try:
+            soup = self._get_soup(url, params={"axnm": album_id})
+            return parsers.parse_album_detail(soup, album_id)
+        except Exception as e:
+            print(f"앨범 정보 조회 실패: {e}")
+            return None
